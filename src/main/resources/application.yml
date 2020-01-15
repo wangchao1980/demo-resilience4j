@@ -1,0 +1,84 @@
+server:
+  port: 8080
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
+  health:
+    diskspace:
+      enabled: false
+    circuitbreakers:
+      enabled: true
+    ratelimiters:
+      enabled: true
+
+resilience4j: 
+  circuitbreaker: # 断路器
+    configs: 
+      default: 
+        registerHealthIndicator: true # 健康监测
+        ringBufferSizeInClosedState: 10 # 熔断器关闭时的缓冲区大小
+        ringBufferSizeInHalfOpenState: 5 # 熔断器半开时的缓冲区大小
+        waitDurationInOpenState: 10000 # 熔断器从打开到半开需要的时间
+        failureRateThreshold: 50 # 熔断器打开的失败阈值
+        eventConsumerBufferSize: 10 # 事件缓冲区大小
+        automaticTransitionFromOpenToHalfOpenEnabled: true # 是否自动从打开到半开
+        recordFailurePredicate: com.redblue.exception.RecordFailurePredicate # 判断为请求失败的异常
+        #recordExceptions: # 记录的异常
+        #  - com.redblue.exception.BusinessBException
+        #ignoreExceptions: # 忽略的异常
+        #  - com.redblue.exception.BusinessAException
+    instances: 
+      girl: 
+        base-config: default
+  retry: # 失败重试
+    #retry-aspect-order: 999 # Retry, bulkhead, Circuit breaker,rateLimiter 的优先级数值，决定执行顺序 默认分别是 Integer.MAX_VALUE-3、Integer.MAX_VALUE-2、Integer.MAX_VALUE-1 以及 Integer.MAX_VALUE
+    configs: 
+      default: 
+        maxRetryAttempts: 5 # 最大重试次数
+        waitDuration: 100 # 下一次重试等待时间，最小为100 ms
+        eventConsumerBufferSize: 10 # 重试事件缓冲区大小
+        enableExponentialBackoff: true # 是否开启指数退避抖动算法，当一次调用失败后，如果在相同的时间间隔内发起重试，有可能发生连续的调用失败，因此可以开启指数退避抖动算法
+        exponentialBackoffMultiplier: 2 # 时间间隔乘数
+        enableRandomizedWait: false # 下次重试的时间间隔是否随机
+        randomizedWaitFactor: 2
+        retryExceptionPredicate: com.redblue.exception.RecordFailurePredicate
+        retryExceptions:  # 需要重试的异常
+          - org.springframework.web.client.HttpServerErrorException
+          - java.io.IOException
+        ignoreExceptions:  # 忽略的异常
+          - com.redblue.exception.BusinessException
+    instances: 
+      girl: 
+        base-config: default
+  ratelimiter: # 限流
+    configs:
+      default:
+        timeout-duration: 1000 # 超时等待时间，默认5秒
+        limit-for-period: 1 # 请求频次的阈值
+        limit-refresh-period: 1000 # 周期时长
+        subscribe-for-events: true # 开启事件订阅
+        event-consumer-buffer-size: 1 # 事件缓冲区大小
+        register-health-indicator: true # 健康监测
+  bulkhead: # 隔离
+    configs:
+      default:
+        maxConcurrentCalls: 5 # 最大并发数
+        maxWaitDuration: 100ms # 最大等待时长
+    instances:
+      girl:
+        base-config: default
+  thread-pool-bulkhead: # 线程隔离
+    configs:
+      default:
+        maxThreadPoolSize: 4 # 最大线程数
+        coreThreadPoolSize: 2 # 核心线程数
+        queueCapacity: 2 # 队列容量
+        keepAliveDuration: 20ms # 线程存活时间
+    instances:
+      girl:
+        base-config: default
